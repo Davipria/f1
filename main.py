@@ -5,100 +5,151 @@ from data_model import TyreDataModeler
 from optimizers import GreedySolver, GeneticOptimizer
 
 def check_legality(strategy):
+    """Checks if the strategy respects the 2-compound rule."""
     compounds = set(s[0] for s in strategy)
     if len(compounds) < 2:
         return "ILLEGAL (DSQ: < 2 compounds)"
     return "VALID"
 
 def get_user_input():
+    """
+    Handles mandatory interactive input.
+    No defaults allowed: the user MUST choose.
+    """
     print("\n==========================================")
-    print("      CONFIGURAZIONE SIMULAZIONE F1       ")
+    print("      F1 SIMULATION CONFIGURATION         ")
     print("==========================================")
     
-    # 1. Anno
+    # --- 1. YEAR SELECTION ---
     while True:
         try:
-            str_year = input("\nInserisci Anno (es. 2024): ").strip()
-            if str_year == "": continue
+            str_year = input("\nEnter Year: ").strip()
+            
+            if str_year == "":
+                print("Error: You must enter a year.")
+                continue
+                
             year = int(str_year)
+            
+            # Validity check (FastF1 has good data from 2018 onwards)
             if year < 2018 or year > 2025:
-                if input("Anno fuori standard. Proseguire? (s/n): ").lower() != 's': continue
+                print(f"Warning: Year {year} might not have complete data.")
+                confirm = input("Do you want to continue anyway? (y/n): ").strip().lower()
+                if confirm != 'y':
+                    continue
             break
-        except ValueError: pass
+        except ValueError:
+            print("Error: Please enter a valid numeric year (e.g. 2023).")
 
-    # 2. Calendario
-    print(f"\nSto scaricando il calendario {year}...")
+    # --- 2. RETRIEVING CALENDAR ---
+    print(f"\nDownloading {year} calendar from FastF1...")
     try:
+        # Download calendar 
         schedule = fastf1.get_event_schedule(year, include_testing=False)
-        races = schedule[schedule['RoundNumber'] > 0][['EventName', 'Location']].reset_index(drop=True)
-        if races.empty: return get_user_input()
+        races = schedule[schedule['RoundNumber'] > 0][['EventName', 'Location', 'RoundNumber']].reset_index(drop=True)
+        
+        if races.empty:
+            print(f"No races found for year {year}.")
+            return get_user_input()
+
     except Exception as e:
-        print(e); exit()
+        print(f"Critical error downloading calendar: {e}")
+        exit()
 
-    # 3. Scelta Gara
-    print(f"\nGare {year}:")
-    print("-" * 40)
+    # --- 3. RACE SELECTION MENU ---
+    print(f"\nAvailable races for {year} season:")
+    print("-" * 50)
     for idx, row in races.iterrows():
-        print(f"{idx + 1:2}. {row['EventName']}")
-    print("-" * 40)
+        print(f"{idx + 1:2}. {row['EventName']} ({row['Location']})")
+    print("-" * 50)
 
+    # --- 4. USER CHOICE ---
     while True:
         try:
-            s = int(input(f"\nNumero gara (1-{len(races)}): "))
-            if 1 <= s <= len(races):
-                return year, races.iloc[s - 1]['EventName']
-        except ValueError: pass
+            sel_str = input(f"\nChoose race number (1-{len(races)}): ").strip()
+            
+            if sel_str == "":
+                print("Error: You must enter a number.")
+                continue
+                
+            selection = int(sel_str)
+            
+            if 1 <= selection <= len(races):
+                selected_gp = races.iloc[selection - 1]['EventName']
+                print(f"--> You selected: {selected_gp.upper()}")
+                return year, selected_gp
+            else:
+                print(f"Error: Number must be between 1 and {len(races)}.")
+        except ValueError:
+            print("Error: Please enter a valid number.")
 
 def main():
+    # PHASE 0: INTERACTIVE INPUT
     race_year, race_gp = get_user_input()
 
     print("\n==========================================")
     print(f"   STARTING SIMULATION: {race_gp.upper()} {race_year}   ")
     print("==========================================")
 
-    # FASE 1: DATI
+    # PHASE 1: DATA PROCESS
+    print(f"\n[1/3] Extracting Telemetry Data...")
+    
     try:
         data_engine = TyreDataModeler(race_year, race_gp)
         data_engine.load_and_clean_data()
         data_engine.analyze_degradation()
         
-        # RECUPERIAMO ANCHE LA PIT LOSS DINAMICA
         real_tyre_models, total_laps, dynamic_pit_loss = data_engine.get_simulation_data()
         
     except Exception as e:
-        print(f"\n[ERRORE] {e}"); return
+        print(f"\n[ERROR] Could not load race data: {e}")
+        print("Tip: Check internet connection or try another race.")
+        return
 
-    print(f"\nParametri Estratti:")
-    print(f"Giri Totali: {total_laps}")
-    print(f"Pit Loss Dinamica: {dynamic_pit_loss:.2f}s")
+    print(f"\nExtracted Parameters for {race_gp}:")
+    print(f"Total Laps: {total_laps}")
+    print(f"Dynamic Pit Loss: {dynamic_pit_loss:.2f}s")
     for k, v in real_tyre_models.items():
         print(f"{k}: Base={v['base_pace']:.2f}s, Deg={v['degradation']:.3f}s/lap")
 
-    # FASE 2: GREEDY (Passiamo la pit_loss dinamica)
-    print("\n[2/3] Greedy Algorithm...")
+    # PHASE 2: GREEDY ALGORITHM
+    print("\n[2/3] Running Greedy Algorithm...")
     greedy = GreedySolver(real_tyre_models, total_laps, pit_loss=dynamic_pit_loss)
-    gt, gs = greedy.solve()
-    print(f"Greedy: {gt:.2f}s | {gs} -> {check_legality(gs)}")
+    greedy_time, greedy_stints = greedy.solve()
+    
+    print(f"Greedy Time: {greedy_time:.2f}s")
+    print(f"Greedy Strategy: {greedy_stints} -> {check_legality(greedy_stints)}")
 
-    # FASE 3: GENETIC (Passiamo la pit_loss dinamica)
-    print("\n[3/3] Genetic Algorithm...")
+    # PHASE 3: GENETIC ALGORITHM
+    print("\n[3/3] Running Genetic Algorithm...")
     ga = GeneticOptimizer(
         tyre_models=real_tyre_models, 
         total_laps=total_laps,
-        pop_size=80, generations=60, mutation_rate=0.25,
-        pit_loss=dynamic_pit_loss # <--- Qui passiamo il valore calcolato
+        pop_size=80,       
+        generations=60,    
+        mutation_rate=0.25,
+        pit_loss=dynamic_pit_loss
     )
-    best = ga.run()
-    print(f"Genetic: {best.fitness:.2f}s | {best.genes} -> {check_legality(best.genes)}")
     
-    print(f"\n>>> GUADAGNO: {gt - best.fitness:.2f}s <<<")
+    best_solution = ga.run()
+    
+    print(f"Best GA Time: {best_solution.fitness:.2f}s")
+    print(f"GA Strategy: {best_solution.genes} -> {check_legality(best_solution.genes)}")
+    
+    improvement = greedy_time - best_solution.fitness
+    print(f"\n>>> STRATEGIC GAIN: {improvement:.2f} seconds <<<")
 
-    # FASE 4: PLOT
+    # PHASE 4: VISUALIZATION
     plt.figure(figsize=(10, 6))
-    plt.plot(ga.best_history, label='Genetic', color='blue')
-    plt.axhline(y=gt, color='red', linestyle='--', label='Greedy')
-    plt.title(f"Optimization: {race_gp} {race_year} (PitLoss: {dynamic_pit_loss:.1f}s)")
-    plt.xlabel("Generations"); plt.ylabel("Time (s)"); plt.legend(); plt.grid(True, alpha=0.3)
+    plt.plot(ga.best_history, label='Genetic Evolution', color='blue', linewidth=2)
+    plt.axhline(y=greedy_time, color='red', linestyle='--', label='Enhanced Greedy', linewidth=2)
+    plt.title(f"Optimization Analysis: {race_gp} {race_year}")
+    plt.xlabel("Generations")
+    plt.ylabel("Total Race Time (s)")
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    
+    print("\nChart generation completed.")
     plt.show()
 
 if __name__ == "__main__":

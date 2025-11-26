@@ -24,7 +24,7 @@ class TyreDataModeler:
         session = fastf1.get_session(self.year, self.gp, self.session_type)
         session.load()
         
-        # Calcolo Pit Loss PRIMA dei filtri
+        # Calculate the pit loss
         self.pit_loss = self._calculate_pit_loss(session)
         print(f"--> Pit Loss Calcolata (Mediana): {self.pit_loss:.2f}s")
         
@@ -37,16 +37,15 @@ class TyreDataModeler:
 
     def _calculate_pit_loss(self, session):
         """
-        Calcola il tempo perso usando la MEDIANA per ignorare pit stop lenti/incidenti.
+        Calculate the time loss using the median method to ignore slow pit stops or incidents.
         Formula: Loss = (Median InLap + Median OutLap) - (2 * Median CleanLap)
         """
         laps = session.laps.pick_track_status('1')
         laps['LapTimeSec'] = laps['LapTime'].dt.total_seconds()
         
-        # 1. Giri Puliti (Median Race Lap)
+        # 1. Clean Laps (Median Race Lap)
         clean_laps = laps[laps['PitOutTime'].isnull() & laps['PitInTime'].isnull()]
         if clean_laps.empty: return 23.0
-        # Usiamo la mediana per il passo gara standard
         avg_race = clean_laps['LapTimeSec'].median()
         
         # 2. In-Laps (Median)
@@ -56,7 +55,7 @@ class TyreDataModeler:
         
         # 3. Out-Laps (Median)
         out_laps = laps[~laps['PitOutTime'].isnull()]
-        out_laps = out_laps[out_laps['LapNumber'] > 1] # Via il giro 1
+        out_laps = out_laps[out_laps['LapNumber'] > 1] 
         if out_laps.empty: return 23.0
         avg_out = out_laps['LapTimeSec'].median()
         

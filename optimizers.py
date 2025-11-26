@@ -1,27 +1,27 @@
 import random
 
-PIT_LOSS = 23.0  # Tempo perso in pit lane 
+PIT_LOSS = 23.0 #Default time
 
-# --- 1. LIMITI STRUTTURALI (Massima vita consentita) ---
+# --- 1. STRUCTURAL LIMITS (Max tire life) ---
 MAX_LIFE = {
     'SOFT': 18,    
     'MEDIUM': 28,
     'HARD': 45     
 }
 
-# --- 2. USURA FISICA NON LINEARE (Il "Cliff") ---
+# --- 2. NON-LINEAR PHYSICAL WEAR (The "Cliff") ---
 NON_LINEAR_WEAR = {
     'SOFT': 0.005,    
     'MEDIUM': 0.002,  
     'HARD': 0.001     
 }
 
-# --- 3. WARM-UP TERMICO ---
-# Secondi persi nel primo giro (Out-lap) a causa della gomma fredda
+# --- 3. TERMIC WARM-UP ---
+# Time lost during Out-lap because of the tyre temperature
 WARMUP_PENALTY = {
-    'SOFT': 0.5,   # Si scalda subito
-    'MEDIUM': 1.5, # Medio
-    'HARD': 4.5    # "Ghiacciata", ci mette molto a funzionare
+    'SOFT': 0.5,   
+    'MEDIUM': 1.5, 
+    'HARD': 4.5    
 }
 
 class StrategyIndividual:
@@ -70,7 +70,7 @@ class StrategyIndividual:
         for i, (comp, laps) in enumerate(self.genes):
             model = self.tyre_models[comp]
             
-            # 1. Componente Lineare + Non-Lineare
+            # 1. Linear component + non-linear component
             linear_time = (model['base_pace'] * laps) + (model['degradation'] * (laps * (laps - 1) / 2))
             
             wear_factor = NON_LINEAR_WEAR.get(comp, 0.002)
@@ -80,13 +80,13 @@ class StrategyIndividual:
             
             stint_time = linear_time + nonlinear_time
             
-            # 2. Penalità Logistiche e Fisiche
-            if i > 0: # Se non è la partenza da fermo
+            # 2. Logistic and Physical Penalties
+            if i > 0: 
                 traffic_laps = min(3, laps)
                 stint_time += traffic_laps * 1.5 
                 
-                # --- NUOVO: PENALITÀ WARM-UP SPECIFICA ---
-                # Aggiungiamo il costo di riscaldamento specifico per mescola
+                # --- SPECIFIC WARM-UP PENALTY ---
+                # Add the warm-up cost for every tire-type
                 w_pen = WARMUP_PENALTY.get(comp, 3.0)
                 stint_time += w_pen 
                 # ----------------------------------------
@@ -170,7 +170,6 @@ class GreedySolver:
         self.pit_loss = pit_loss
 
     def solve(self):
-        # Partenza intelligente
         current_compound = min(self.tyre_models, key=lambda k: self.tyre_models[k]['base_pace'])
         current_tyre_age = 0
         stints = []
@@ -184,7 +183,7 @@ class GreedySolver:
         for lap in range(1, self.total_laps + 1):
             model = self.tyre_models[current_compound]
             
-            # Calcolo Tempo Giro
+            # Lap Time Calculation
             wear_factor = NON_LINEAR_WEAR.get(current_compound, 0.002)
             linear_deg = model['degradation'] * current_tyre_age
             nonlinear_deg = wear_factor * (current_tyre_age ** 2)
@@ -192,7 +191,7 @@ class GreedySolver:
             
             current_tyre_age += 1
             
-            # Condizioni Pit Stop
+            # Pit Stop Conditions
             limit = MAX_LIFE.get(current_compound, 40)
             is_unsafe = current_tyre_age >= limit 
             is_slow = (lap_time > model['base_pace'] + pit_threshold_loss + traffic_fear_factor)
@@ -204,7 +203,7 @@ class GreedySolver:
                 stints.append([current_compound, lap - stint_start_lap])
                 total_time += self.pit_loss
                 
-                # --- SCELTA INTELLIGENTE PROSSIMA GOMMA ---
+                # --- SMARTEST CHOICE FOR NEXT TYRES ---
                 candidates = list(self.tyre_models.keys())
                 if must_change:
                     candidates = [c for c in candidates if c not in compounds_used]
@@ -219,11 +218,11 @@ class GreedySolver:
                     cand_model = self.tyre_models[cand]
                     cand_wear = NON_LINEAR_WEAR.get(cand, 0.002)
                     
-                    # Costo iniziale Warm-up
+                    # Initial Warm-up cost
                     w_pen = WARMUP_PENALTY.get(cand, 3.0)
                     predicted_time = w_pen 
                     
-                    # Simuliamo lo stint futuro
+                    # Simulate next stint
                     for t in range(prediction_horizon):
                         lin = cand_model['degradation'] * t
                         non_lin = cand_wear * (t**2)
