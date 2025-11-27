@@ -1,8 +1,8 @@
 import random
-import numpy as np  # Added for global seeding
+import numpy as np  
 import fastf1
 import pandas as pd
-import config       # Import the configuration file
+import config      
 from data_model import TyreDataModeler
 from optimizers import GreedySolver, GeneticOptimizer
 from visualization import plot_results   
@@ -125,7 +125,6 @@ def main():
     # PHASE 3: GENETIC ALGORITHM
     print("\n[3/3] Running Genetic Algorithm...")
     
-    # Updated to use settings from config.py
     ga = GeneticOptimizer(
         tyre_models=real_tyre_models, 
         total_laps=total_laps,

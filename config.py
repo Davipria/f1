@@ -1,5 +1,3 @@
-# config.py
-
 # --- DEFAULT PIT STOP LOSS ---
 DEFAULT_PIT_LOSS = 23.0
 

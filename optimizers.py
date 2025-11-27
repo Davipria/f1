@@ -47,7 +47,7 @@ class StrategyIndividual:
         for i, (comp, laps) in enumerate(self.genes):
             model = self.tyre_models[comp]
             
-            # 1. Componente Lineare + Non-lineare (usando config)
+            # 1. Linear Component + Non-linear Component
             linear_time = (model['base_pace'] * laps) + (model['degradation'] * (laps * (laps - 1) / 2))
             
             wear_factor = config.NON_LINEAR_WEAR.get(comp, 0.002)
@@ -57,7 +57,7 @@ class StrategyIndividual:
             
             stint_time = linear_time + nonlinear_time
             
-            # 2. Penalità Logistiche e Fisiche
+            # 2. Logistic and physics penalties
             if i > 0: 
                 traffic_laps = min(3, laps)
                 stint_time += traffic_laps * 1.5 
@@ -218,7 +218,7 @@ class GreedySolver:
                 current_tyre_age = 0
                 stint_start_lap = lap
 
-                # --- PENALTIES (Allineate con GA) ---
+                # --- WARM UP PENALTIES ---
                 total_time += config.WARMUP_PENALTY.get(current_compound, 3.0)
                 traffic_laps = min(3, laps_remaining)
                 total_time += traffic_laps * 1.5
