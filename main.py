@@ -1,8 +1,11 @@
-import matplotlib.pyplot as plt
+import random
+import numpy as np  # Added for global seeding
 import fastf1
 import pandas as pd
+import config       # Import the configuration file
 from data_model import TyreDataModeler
 from optimizers import GreedySolver, GeneticOptimizer
+from visualization import plot_results   
 
 def check_legality(strategy):
     """Checks if the strategy respects the 2-compound rule."""
@@ -24,14 +27,11 @@ def get_user_input():
     while True:
         try:
             str_year = input("\nEnter Year: ").strip()
-            
             if str_year == "":
                 print("Error: You must enter a year.")
-                continue
-                
+                continue     
             year = int(str_year)
             
-            # Validity check (FastF1 has good data from 2018 onwards)
             if year < 2018 or year > 2025:
                 print(f"Warning: Year {year} might not have complete data.")
                 confirm = input("Do you want to continue anyway? (y/n): ").strip().lower()
@@ -44,7 +44,6 @@ def get_user_input():
     # --- 2. RETRIEVING CALENDAR ---
     print(f"\nDownloading {year} calendar from FastF1...")
     try:
-        # Download calendar 
         schedule = fastf1.get_event_schedule(year, include_testing=False)
         races = schedule[schedule['RoundNumber'] > 0][['EventName', 'Location', 'RoundNumber']].reset_index(drop=True)
         
@@ -67,11 +66,9 @@ def get_user_input():
     while True:
         try:
             sel_str = input(f"\nChoose race number (1-{len(races)}): ").strip()
-            
             if sel_str == "":
                 print("Error: You must enter a number.")
-                continue
-                
+                continue     
             selection = int(sel_str)
             
             if 1 <= selection <= len(races):
@@ -84,6 +81,11 @@ def get_user_input():
             print("Error: Please enter a valid number.")
 
 def main():
+    # --- 0. SETUP RANDOM SEED ---
+    random.seed(config.RANDOM_SEED)
+    np.random.seed(config.RANDOM_SEED)
+    print(f"Random Seed set to: {config.RANDOM_SEED} (Reproducibility: ON)")
+
     # PHASE 0: INTERACTIVE INPUT
     race_year, race_gp = get_user_input()
 
@@ -122,12 +124,14 @@ def main():
 
     # PHASE 3: GENETIC ALGORITHM
     print("\n[3/3] Running Genetic Algorithm...")
+    
+    # Updated to use settings from config.py
     ga = GeneticOptimizer(
         tyre_models=real_tyre_models, 
         total_laps=total_laps,
-        pop_size=80,       
-        generations=60,    
-        mutation_rate=0.25,
+        pop_size=config.GA_SETTINGS['POP_SIZE'],       
+        generations=config.GA_SETTINGS['GENERATIONS'],    
+        mutation_rate=config.GA_SETTINGS['MUTATION_RATE'],
         pit_loss=dynamic_pit_loss
     )
     
@@ -140,17 +144,9 @@ def main():
     print(f"\n>>> STRATEGIC GAIN: {improvement:.2f} seconds <<<")
 
     # PHASE 4: VISUALIZATION
-    plt.figure(figsize=(10, 6))
-    plt.plot(ga.best_history, label='Genetic Evolution', color='blue', linewidth=2)
-    plt.axhline(y=greedy_time, color='red', linestyle='--', label='Enhanced Greedy', linewidth=2)
-    plt.title(f"Optimization Analysis: {race_gp} {race_year}")
-    plt.xlabel("Generations")
-    plt.ylabel("Total Race Time (s)")
-    plt.legend()
-    plt.grid(True, alpha=0.3)
-    
-    print("\nChart generation completed.")
-    plt.show()
+    print("\nGenerating results chart...")
+    plot_results(ga.best_history, greedy_time, greedy_stints, best_solution.genes, race_gp, race_year)
+    print("Chart generation completed.")
 
 if __name__ == "__main__":
     main()

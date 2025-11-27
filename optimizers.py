@@ -1,34 +1,11 @@
 import random
-
-PIT_LOSS = 23.0 #Default time
-
-# --- 1. STRUCTURAL LIMITS (Max tire life) ---
-MAX_LIFE = {
-    'SOFT': 18,    
-    'MEDIUM': 28,
-    'HARD': 45     
-}
-
-# --- 2. NON-LINEAR PHYSICAL WEAR (The "Cliff") ---
-NON_LINEAR_WEAR = {
-    'SOFT': 0.005,    
-    'MEDIUM': 0.002,  
-    'HARD': 0.001     
-}
-
-# --- 3. TERMIC WARM-UP ---
-# Time lost during Out-lap because of the tyre temperature
-WARMUP_PENALTY = {
-    'SOFT': 0.5,   
-    'MEDIUM': 1.5, 
-    'HARD': 4.5    
-}
+import config  # Importiamo il file di configurazione
 
 class StrategyIndividual:
     """
     GENETIC ALGORITHM CHROMOSOME
     """
-    def __init__(self, tyre_models, total_laps, stints=None, pit_loss=PIT_LOSS):
+    def __init__(self, tyre_models, total_laps, stints=None, pit_loss=config.DEFAULT_PIT_LOSS):
         self.tyre_models = tyre_models
         self.total_laps = total_laps
         self.pit_loss = pit_loss
@@ -70,31 +47,30 @@ class StrategyIndividual:
         for i, (comp, laps) in enumerate(self.genes):
             model = self.tyre_models[comp]
             
-            # 1. Linear component + non-linear component
+            # 1. Componente Lineare + Non-lineare (usando config)
             linear_time = (model['base_pace'] * laps) + (model['degradation'] * (laps * (laps - 1) / 2))
             
-            wear_factor = NON_LINEAR_WEAR.get(comp, 0.002)
+            wear_factor = config.NON_LINEAR_WEAR.get(comp, 0.002)
             n = laps
             sum_squares = ((n - 1) * n * (2 * n - 1)) / 6
             nonlinear_time = wear_factor * sum_squares
             
             stint_time = linear_time + nonlinear_time
             
-            # 2. Logistic and Physical Penalties
+            # 2. Penalità Logistiche e Fisiche
             if i > 0: 
                 traffic_laps = min(3, laps)
                 stint_time += traffic_laps * 1.5 
                 
-                # --- SPECIFIC WARM-UP PENALTY ---
-                # Add the warm-up cost for every tire-type
-                w_pen = WARMUP_PENALTY.get(comp, 3.0)
+                # Warm-up da config
+                w_pen = config.WARMUP_PENALTY.get(comp, 3.0)
                 stint_time += w_pen 
-                # ----------------------------------------
 
                 if laps < 10:
                     stint_time += (10 - laps) * 4.0 
 
-            limit = MAX_LIFE.get(comp, 40)
+            # Limite massimo da config
+            limit = config.MAX_LIFE.get(comp, 40)
             if laps > limit:
                 over_limit = laps - limit
                 stint_time += over_limit * 20.0 
@@ -107,7 +83,12 @@ class StrategyIndividual:
         return self.fitness
 
 class GeneticOptimizer:
-    def __init__(self, tyre_models, total_laps, pop_size=60, generations=50, mutation_rate=0.2, pit_loss=PIT_LOSS):
+    # Usiamo i default da GA_SETTINGS se non specificati
+    def __init__(self, tyre_models, total_laps, 
+                 pop_size=config.GA_SETTINGS['POP_SIZE'], 
+                 generations=config.GA_SETTINGS['GENERATIONS'], 
+                 mutation_rate=config.GA_SETTINGS['MUTATION_RATE'], 
+                 pit_loss=config.DEFAULT_PIT_LOSS):
         self.tyre_models = tyre_models
         self.total_laps = total_laps
         self.pit_loss = pit_loss
@@ -164,7 +145,7 @@ class GreedySolver:
     """
     SMART GREEDY (EVALUATIVE)
     """
-    def __init__(self, tyre_models, total_laps, pit_loss=PIT_LOSS):
+    def __init__(self, tyre_models, total_laps, pit_loss=config.DEFAULT_PIT_LOSS):
         self.tyre_models = tyre_models
         self.total_laps = total_laps
         self.pit_loss = pit_loss
@@ -184,15 +165,15 @@ class GreedySolver:
             model = self.tyre_models[current_compound]
             
             # Lap Time Calculation
-            wear_factor = NON_LINEAR_WEAR.get(current_compound, 0.002)
+            wear_factor = config.NON_LINEAR_WEAR.get(current_compound, 0.002)
             linear_deg = model['degradation'] * current_tyre_age
             nonlinear_deg = wear_factor * (current_tyre_age ** 2)
             lap_time = model['base_pace'] + linear_deg + nonlinear_deg
             
             current_tyre_age += 1
             
-            # Pit Stop Conditions
-            limit = MAX_LIFE.get(current_compound, 40)
+            # Pit Stop Conditions (Limits from config)
+            limit = config.MAX_LIFE.get(current_compound, 40)
             is_unsafe = current_tyre_age >= limit 
             is_slow = (lap_time > model['base_pace'] + pit_threshold_loss + traffic_fear_factor)
             
@@ -216,10 +197,10 @@ class GreedySolver:
                 
                 for cand in candidates:
                     cand_model = self.tyre_models[cand]
-                    cand_wear = NON_LINEAR_WEAR.get(cand, 0.002)
+                    cand_wear = config.NON_LINEAR_WEAR.get(cand, 0.002)
                     
-                    # Initial Warm-up cost
-                    w_pen = WARMUP_PENALTY.get(cand, 3.0)
+                    # Initial Warm-up cost (From config)
+                    w_pen = config.WARMUP_PENALTY.get(cand, 3.0)
                     predicted_time = w_pen 
                     
                     # Simulate next stint
@@ -236,6 +217,11 @@ class GreedySolver:
                 compounds_used.add(current_compound)
                 current_tyre_age = 0
                 stint_start_lap = lap
+
+                # --- PENALTIES (Allineate con GA) ---
+                total_time += config.WARMUP_PENALTY.get(current_compound, 3.0)
+                traffic_laps = min(3, laps_remaining)
+                total_time += traffic_laps * 1.5
                 
             total_time += lap_time
             

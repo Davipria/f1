@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
+import config
 
 if not os.path.exists('cache'):
     os.makedirs('cache')
@@ -17,8 +18,8 @@ class TyreDataModeler:
         self.session_type = session_type
         self.laps = None
         self.models = {} 
-        self.pit_loss = 23.0 
-
+        self.pit_loss = config.DEFAULT_PIT_LOSS
+        
     def load_and_clean_data(self):
         print(f"Loading {self.gp} {self.year}...")
         session = fastf1.get_session(self.year, self.gp, self.session_type)
@@ -45,18 +46,18 @@ class TyreDataModeler:
         
         # 1. Clean Laps (Median Race Lap)
         clean_laps = laps[laps['PitOutTime'].isnull() & laps['PitInTime'].isnull()]
-        if clean_laps.empty: return 23.0
+        if clean_laps.empty: return config.DEFAULT_PIT_LOSS
         avg_race = clean_laps['LapTimeSec'].median()
         
         # 2. In-Laps (Median)
         in_laps = laps[~laps['PitInTime'].isnull()]
-        if in_laps.empty: return 23.0
+        if in_laps.empty: return config.DEFAULT_PIT_LOSS
         avg_in = in_laps['LapTimeSec'].median()
         
         # 3. Out-Laps (Median)
         out_laps = laps[~laps['PitOutTime'].isnull()]
         out_laps = out_laps[out_laps['LapNumber'] > 1] 
-        if out_laps.empty: return 23.0
+        if out_laps.empty: return config.DEFAULT_PIT_LOSS
         avg_out = out_laps['LapTimeSec'].median()
         
         loss = (avg_in + avg_out) - (2 * avg_race)
