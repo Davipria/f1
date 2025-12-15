@@ -97,9 +97,14 @@ def main():
     print(f"\n[1/3] Extracting Telemetry Data...")
     
     try:
-        data_engine = TyreDataModeler(race_year, race_gp)
+        # NEW: Added visualize_fits parameter (set to False by default)
+        # To enable visualization, change to: visualize_fits=True
+        data_engine = TyreDataModeler(race_year, race_gp, visualize_fits=False)
         data_engine.load_and_clean_data()
         data_engine.analyze_degradation()
+        
+        # NEW: Print model quality summary
+        data_engine.print_model_summary()
         
         real_tyre_models, total_laps, dynamic_pit_loss = data_engine.get_simulation_data()
         
@@ -111,8 +116,13 @@ def main():
     print(f"\nExtracted Parameters for {race_gp}:")
     print(f"Total Laps: {total_laps}")
     print(f"Dynamic Pit Loss: {dynamic_pit_loss:.2f}s")
+    print("\nTyre Model Coefficients (Polynomial Regression):")
+    print("-" * 70)
+    print(f"{'Compound':<10} {'Base Pace':<12} {'Linear':<15} {'Quadratic':<15}")
+    print("-" * 70)
     for k, v in real_tyre_models.items():
-        print(f"{k}: Base={v['base_pace']:.2f}s, Deg={v['degradation']:.3f}s/lap")
+        print(f"{k:<10} {v['base_pace']:>10.2f}s  {v['linear_degradation']:>13.4f}s/lap  {v['quadratic_degradation']:>13.6f}s/lap²")
+    print("-" * 70)
 
     # PHASE 2: GREEDY ALGORITHM
     print("\n[2/3] Running Greedy Algorithm...")
@@ -131,7 +141,8 @@ def main():
         pop_size=config.GA_SETTINGS['POP_SIZE'],       
         generations=config.GA_SETTINGS['GENERATIONS'],    
         mutation_rate=config.GA_SETTINGS['MUTATION_RATE'],
-        pit_loss=dynamic_pit_loss
+        pit_loss=dynamic_pit_loss,
+        crossover_type=config.GA_SETTINGS['CROSSOVER_TYPE']  # NEW: Pass crossover type
     )
     
     best_solution = ga.run()
@@ -140,7 +151,9 @@ def main():
     print(f"GA Strategy: {best_solution.genes} -> {check_legality(best_solution.genes)}")
     
     improvement = greedy_time - best_solution.fitness
-    print(f"\n>>> STRATEGIC GAIN: {improvement:.2f} seconds <<<")
+    print(f"\n{'='*70}")
+    print(f">>> STRATEGIC GAIN: {improvement:.2f} seconds ({(improvement/greedy_time)*100:.2f}%) <<<")
+    print(f"{'='*70}")
 
     # PHASE 4: VISUALIZATION
     print("\nGenerating results chart...")
