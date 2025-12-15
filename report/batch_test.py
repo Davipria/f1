@@ -1,14 +1,3 @@
-"""
-Batch Testing Script for F1 Strategy Optimizer
-
-Automatically tests the Genetic Algorithm vs Greedy on multiple Grand Prix
-and saves results for statistical analysis.
-
-Usage:
-    python batch_test.py --year 2024 --runs 3
-    python batch_test.py --year 2024 --circuits "Monza,Silverstone,Monaco"
-"""
-
 import random
 import numpy as np
 import pandas as pd
@@ -20,6 +9,15 @@ from pathlib import Path
 import config
 from data_model import TyreDataModeler
 from optimizers import GeneticOptimizer, GreedySolver
+
+"""
+Batch Testing Script for F1 Strategy Optimizer
+
+Automatically tests the Genetic Algorithm vs Greedy on multiple Grand Prix
+and saves results for statistical analysis.
+
+"""
+
 
 class BatchTester:
     def __init__(self, year, output_dir="results"):

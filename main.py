@@ -97,13 +97,13 @@ def main():
     print(f"\n[1/3] Extracting Telemetry Data...")
     
     try:
-        # NEW: Added visualize_fits parameter (set to False by default)
+        # Added visualize_fits parameter to enable visualization of the degradation model (set to False by default)
         # To enable visualization, change to: visualize_fits=True
         data_engine = TyreDataModeler(race_year, race_gp, visualize_fits=False)
         data_engine.load_and_clean_data()
         data_engine.analyze_degradation()
         
-        # NEW: Print model quality summary
+        # Print model quality summary
         data_engine.print_model_summary()
         
         real_tyre_models, total_laps, dynamic_pit_loss = data_engine.get_simulation_data()
@@ -142,7 +142,7 @@ def main():
         generations=config.GA_SETTINGS['GENERATIONS'],    
         mutation_rate=config.GA_SETTINGS['MUTATION_RATE'],
         pit_loss=dynamic_pit_loss,
-        crossover_type=config.GA_SETTINGS['CROSSOVER_TYPE']  # NEW: Pass crossover type
+        crossover_type=config.GA_SETTINGS['CROSSOVER_TYPE'] 
     )
     
     best_solution = ga.run()

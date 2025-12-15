@@ -23,7 +23,7 @@ class TyreDataModeler:
         self.models = {} 
         self.model_quality = {} 
         self.pit_loss = config.DEFAULT_PIT_LOSS
-        self.session_avg_pace = 90.0  # Valore iniziale, verrà sovrascritto
+        self.session_avg_pace = 90.0
         
     def load_and_clean_data(self):
         print(f"Loading {self.gp} {self.year}...")
@@ -39,7 +39,6 @@ class TyreDataModeler:
         laps['LapTimeSec'] = laps['LapTime'].dt.total_seconds()
         self.laps = laps[['Driver', 'LapNumber', 'LapTimeSec', 'Compound', 'TyreLife']]
         
-        # CALCOLO PASSO MEDIO DELLA SESSIONE (Per i default dinamici)
         if not self.laps.empty:
             self.session_avg_pace = self.laps['LapTimeSec'].median()
             print(f"--> Session Avg Pace detected: {self.session_avg_pace:.2f}s")
@@ -73,16 +72,15 @@ class TyreDataModeler:
             fig, axes = plt.subplots(1, 3, figsize=(15, 4))
             fig.suptitle(f"Tyre Degradation Analysis: {self.gp} {self.year}", fontsize=14, fontweight='bold')
         
+        # Extraction and fitting of the degradation model
         for idx, compound in enumerate(compounds):
             comp_laps = self.laps[self.laps['Compound'] == compound]
             
-            # Soglia minima bassa (3 giri)
             if len(comp_laps) < 3:
                 print(f"WARNING: No data for {compound} (0-2 laps). Using DYNAMIC defaults.")
                 self._use_defaults(compound)
                 continue
 
-            # Pulizia IQR
             Q1 = comp_laps['LapTimeSec'].quantile(0.25)
             Q3 = comp_laps['LapTimeSec'].quantile(0.75)
             IQR = Q3 - Q1
@@ -106,12 +104,9 @@ class TyreDataModeler:
             c0 = reg.intercept_
             c1, c2 = reg.coef_[1], reg.coef_[2]
             
-            # PROTEZIONE FISICA: coefficiente quadratico non può essere negativo
-            # (Le gomme non "guariscono" col tempo)
             if c2 < 0:
                 print(f"  > Fixing negative quadratic for {compound} ({c2:.6f} -> 0.0)")
                 c2 = 0.0
-                # Opzionale: rifittare lineare, ma settare a 0 è sufficiente per evitare crash
             
             y_pred = reg.predict(X_poly)
             r2 = r2_score(y, y_pred)
@@ -124,30 +119,65 @@ class TyreDataModeler:
                 'linear_degradation': c1,
                 'quadratic_degradation': c2
             }
-            print(f"{compound}: Base={c0:.2f}s, Lin={c1:.4f}, Quad={c2:.6f}, R2={r2:.2f}")
+            print(f"{compound}: Base={c0:.2f}s, Lin={c1:.4f}, Quad={c2:.6f}, R2={r2:.2f} (RAW)")
             
             if self.visualize_fits:
                 ax = axes[idx]
                 ax.scatter(X, y, alpha=0.5, s=20, label='Actual Laps', color='blue')
                 X_range = np.linspace(X.min(), X.max(), 100).reshape(-1, 1)
-                # Plot semplice della curva usata
                 y_plot = c0 + c1 * X_range + c2 * (X_range ** 2)
-                ax.plot(X_range, y_plot, color='red', linewidth=2, label=f'Fit (Used)')
+                ax.plot(X_range, y_plot, color='red', linewidth=2, label=f'Fit')
                 ax.set_title(f"{compound}", fontweight='bold')
                 ax.set_xlabel("Tyre Life")
                 ax.set_ylabel("Lap Time")
                 ax.legend()
                 ax.grid(True, alpha=0.3)
+
+        # Sanity check: correction of absurd values
+        print("\n[SANITY CHECK] Verifying physics consistency...")
         
+        # Create a copy of the keys to iterate, since we may modify self.models
+        compounds_found = [c for c in compounds if c in self.models]
+        
+        if len(compounds_found) == 3:
+            for target in compounds_found:
+                # Take the other two compounds
+                others = [c for c in compounds_found if c != target]
+                
+                pace_target = self.models[target]['base_pace']
+                
+                # Calculate the average of the other two
+                pace_others = [self.models[c]['base_pace'] for c in others]
+                avg_pace_others = sum(pace_others) / len(pace_others)
+                
+                diff = abs(pace_target - avg_pace_others)
+                
+                if diff > 5.0:
+                    print(f"⚠️ ANOMALY DETECTED IN {target}!")
+                    print(f"   Base Pace: {pace_target:.2f}s | Others Avg: {avg_pace_others:.2f}s | Diff: {diff:.2f}s")
+                    print(f"   >>> OVERWRITING WITH AVERAGE OF {others[0]} AND {others[1]}")
+                    
+                    # Calculate the average of the degradations to avoid "monsters" (e.g. 17s/lap)
+                    lin_others = [self.models[c]['linear_degradation'] for c in others]
+                    quad_others = [self.models[c]['quadratic_degradation'] for c in others]
+                    
+                    avg_lin = sum(lin_others) / len(lin_others)
+                    avg_quad = sum(quad_others) / len(quad_others)
+                    
+                    # Overwrite the model
+                    self.models[target] = {
+                        'base_pace': avg_pace_others,
+                        'linear_degradation': avg_lin,
+                        'quadratic_degradation': avg_quad
+                    }
+                    print(f"   New Model: Base={avg_pace_others:.2f}s, Lin={avg_lin:.4f}, Quad={avg_quad:.6f}")
+
         if self.visualize_fits:
             plt.tight_layout()
             plt.show()
 
     def _use_defaults(self, compound):
-        # USA IL PASSO MEDIO DELLA SESSIONE, NON 90.0 FISSO
         base_pace = self.session_avg_pace
-        
-        # Aggiungi un piccolo delta per realismo (Hard più lente delle Soft)
         if compound == 'HARD': base_pace += 0.5
         elif compound == 'SOFT': base_pace -= 0.5
         
@@ -176,6 +206,5 @@ class TyreDataModeler:
         for compound, quality in self.model_quality.items():
             r2 = quality['R2']
             mae = quality['MAE']
-            status = "REAL" if r2 != 0 else "DEFAULT"
-            print(f"{compound:8} | R²={r2:.3f} | MAE={mae:.2f}s | {status}")
+            print(f"{compound:8} | R²={r2:.3f} | MAE={mae:.2f}s")
         print("="*60 + "\n")

@@ -1,13 +1,3 @@
-"""
-Statistical Analysis for F1 Strategy Optimizer Results
-
-Performs comprehensive statistical tests to validate the superiority
-of the Genetic Algorithm over the Greedy baseline.
-
-Usage:
-    python statistical_analysis.py results/batch_results_2024_*.json
-"""
-
 import json
 import numpy as np
 import pandas as pd
@@ -16,6 +6,14 @@ import seaborn as sns
 from scipy import stats
 from pathlib import Path
 import argparse
+
+"""
+Statistical Analysis for F1 Strategy Optimizer Results
+
+Performs comprehensive statistical tests to validate the superiority
+of the Genetic Algorithm over the Greedy baseline.
+
+"""
 
 class StatisticalAnalyzer:
     def __init__(self, results_file):

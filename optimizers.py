@@ -16,7 +16,6 @@ class StrategyIndividual:
         self.fitness = 0.0
 
     def _random_init(self):
-        # MODIFICA: Rispetta il limite massimo di soste del GA
         max_stops = config.GA_SETTINGS['MAX_STOPS']
         n_stops = random.randint(1, max_stops) 
         
@@ -103,7 +102,7 @@ class GeneticOptimizer:
         self.best_history = []
         self.current_generation = 0
         
-        # Carica il limite dal config (Max Stints = Max Stops + 1)
+        # Load the limit from the config (Max Stints = Max Stops + 1)
         self.max_stints = config.GA_SETTINGS['MAX_STOPS'] + 1
 
     def run(self):
@@ -228,10 +227,10 @@ class GeneticOptimizer:
             child_stints.append([compound, stint_length])
             remaining_laps -= stint_length
             
-            # MODIFICA: Controllo sul numero massimo di stint anche qui
+            # Check on the maximum number of stint also here
             if len(child_stints) >= self.max_stints:
                 if remaining_laps > 0:
-                    # Se abbiamo raggiunto il limite, forziamo l'ultimo stint
+                    # If we have reached the limit, force the last stint
                     child_stints[-1][1] += remaining_laps
                 break
         
@@ -281,7 +280,6 @@ class GeneticOptimizer:
                     ind.genes[idx][0] = random.choice(list(self.tyre_models.keys()))
             
             elif mutation_type < 0.8:
-                # Transfer
                 if len(ind.genes) > 1:
                     idx = random.randint(0, len(ind.genes) - 2)
                     transfer = random.randint(-3, 3)
@@ -290,7 +288,7 @@ class GeneticOptimizer:
                         ind.genes[idx + 1][1] -= transfer
             
             else:
-                # MODIFICA: Split Stint controlla il limite max_stints
+                # Split Stint checks the max_stints limit
                 if len(ind.genes) > 0 and len(ind.genes) < self.max_stints: 
                     idx = random.randint(0, len(ind.genes) - 1)
                     original_length = ind.genes[idx][1]
@@ -312,7 +310,6 @@ class GreedySolver:
         self.tyre_models = tyre_models
         self.total_laps = total_laps
         self.pit_loss = pit_loss
-        # Carica il limite massimo di soste dal config
         self.max_stops = config.GREEDY_SETTINGS.get('MAX_STOPS', 3)
 
     def solve(self):
@@ -343,7 +340,6 @@ class GreedySolver:
             laps_remaining = self.total_laps - lap
             must_change = (laps_remaining <= 2) and (len(compounds_used) < 2)
             
-            # Conta quante soste sono state fatte finora
             stops_made = len(stints)
             can_pit_for_pace = stops_made < self.max_stops
             

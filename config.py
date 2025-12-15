@@ -28,7 +28,7 @@ GA_SETTINGS = {
     'GENERATIONS': 100,
     'MUTATION_RATE': 0.3, 
     'CROSSOVER_TYPE': 'mixed',
-    'MAX_STOPS': 3  # <--- NUOVO: Limite massimo di soste anche per il GA
+    'MAX_STOPS': 3  
 }
 
 # --- GREEDY ALGORITHM CONFIGURATION ---
@@ -36,7 +36,7 @@ GREEDY_SETTINGS = {
     'PIT_THRESHOLD': 2.5,     # Seconds of degradation before considering pit stop
     'TRAFFIC_FEAR': 1.5,      # Penalty per lap in traffic (dirty air)
     'PREDICTION_HORIZON': 20, # How many laps to simulate when choosing compound
-    'MAX_STOPS': 3            # Limite massimo di soste per il Greedy
+    'MAX_STOPS': 3          
 }
 
 RANDOM_SEED = 42
