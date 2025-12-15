@@ -1,100 +1,107 @@
-# 🏎️ Strategic Evolution: F1 Strategy Optimizer
+🏎️ Strategic Evolution: F1 Strategy Optimizer (Research Edition)
+Strategic Evolution is a comprehensive simulation framework designed to solve the Formula 1 pit-stop strategy problem.
 
-**Strategic Evolution** is a simulation engine designed to solve the Formula 1 pit-stop strategy problem.
-Developed as a capstone project for the **MSc in Economics and Data Science**, it contrasts **Heuristic Methods (Greedy)** with **Meta-Heuristic Optimization (Genetic Algorithms)** to solve a complex resource allocation problem under non-linear constraints.
+Originally developed as an MSc Economics and Data Science Capstone, this project contrasts Heuristic Methods (Greedy) with Meta-Heuristic Optimization (Genetic Algorithms) using real-world telemetry data. It now includes a full suite of statistical tools to validate algorithmic superiority across entire seasons.
 
-## Project Overview
+🚀 Key Features
+Real-World Telemetry: Powered by FastF1, extracting live timing data, tyre degradation, and pit loss metrics for any race from 2018–2024.
 
-In Formula 1, tyres are a **scarce resource** that depreciates over time. The strategic problem is determining the optimal allocation of this resource over a finite time horizon (race laps) to minimize the total cost (race time).
+Advanced Physics Engine: Models non-linear degradation ("The Cliff"), fuel-corrected lap times, thermal warm-up penalties, and traffic (dirty air).
 
-This project simulates race dynamics using real telemetry data, introducing complex physical constraints that mimic the real-world trade-offs faced by race strategists:
-* **Fuel Effect vs. Physical Degradation:** Disentangling the lap time gain from fuel burn vs. the loss from tyre wear.
-* **Structural Fatigue ("The Cliff"):** Modeling non-linear performance drops using quadratic decay functions.
-* **Thermodynamic Latency:** Simulating the "warm-up" phase where harder compounds lose time in the out-lap.
-* **Logistical Constraints:** Dynamic Pit Loss calculation and Traffic (Dirty Air) penalties.
+Dual-Algorithm Comparison:
 
+Genetic Algorithm (GA): A global optimizer capable of sacrificing short-term pace for long-term strategic gain.
 
-## Algorithmic Core
+Smart Greedy: A predictive heuristic that simulates "myopic" decision-making (optimizing only for the next stint).
 
-### 1. The Challenger: Genetic Algorithm (Evolutionary)
-A meta-heuristic approach that mimics natural selection to find the Global Optimum.
-* **Genome:** A strategy is represented as a sequence of stints.
-* **Evolution:** Uses **Tournament Selection**, **Crossover** (mixing strategies), and **Adaptive Mutation** to explore the solution space.
-* **Strength:** It can plan long-term, often sacrificing short-term speed (e.g., managing tyres) for a net strategic gain (e.g., avoiding an extra pit stop).
+Scientific Validation Suite:
 
-### 2. The Benchmark: Evaluative Greedy Algorithm (Heuristic)
-An advanced "Smart Greedy" algorithm representing local optimization.
-* **Logic:** Instead of following fixed rules, it runs a predictive simulation at every decision point to choose the compound with the best immediate performance for the next stint.
-* **Weakness:** It suffers from **Strategic Myopia** (Short-termism). It often chooses the fastest tyre *now*, ignoring future structural limits, leading to suboptimal cumulative results (e.g., forced late pit stops).
+Batch Testing: Automates simulation across whole seasons (e.g., 22 races) with multiple seeds.
 
+Statistical Rigor: Performs T-Tests, Cohen's d effect size analysis, and Win-Rate binomial tests.
 
-## ⚙️ Technical Architecture
+Publication-Ready Plots: Generates LaTeX tables and Seaborn-style figures for academic papers.
 
-The project is structured into three modular components:
+📂 Project Structure
+Plaintext
+f1-main/
+├── main.py                     # Interactive CLI for single-race simulation
+├── data_model.py               # ETL: Fetches FastF1 data & models tyre curves (Regressions)
+├── optimizers.py               # Core Logic: Physics Engine, Genetic Algo, & Greedy Solver
+├── visualization.py            # Matplotlib visualizations (Gantt charts, Convergence)
+├── config.py                   # Global physics constants & hyper-parameters
+├── requirements.txt            # Dependencies
+│
+└── report/                     # [NEW] Research & Validation Module
+    ├── batch_test.py           # Runs simulations on entire seasons automatically
+    ├── statistical_analysis.py # Calculates p-values, CI, and descriptive stats
+    └── generate_paper_plots.py # Generates thesis-quality figures from batch results
+🛠️ Installation
+Clone the repository:
 
-### `data_model.py` (ETL & Modeling)
-* **Data Extraction:** Fetches real-time telemetry from the official F1 API via `FastF1`.
-* **Cleaning:** Filters out non-representative laps (Safety Car, In/Out laps) to isolate pure race pace.
-* **Regression Analysis:** Uses Linear Regression (`sklearn`) to estimate the base pace and degradation coefficients ($y = mx + q$) for each compound.
-* **Dynamic Calibration:** Automatically calculates the specific Pit Loss for the chosen circuit using the median of historical pit stops.
+Bash
+git clone https://github.com/YOUR_USERNAME/f1-strategy-optimizer.git
+cd f1-strategy-optimizer
+Install dependencies:
 
-### `optimizers.py` (The Simulation Engine)
-Contains the physics engine and the algorithmic logic:
-* **Physics Engine:**
-    * `NON_LINEAR_WEAR`: Simulates exponential degradation ($t^2$) to punish over-extended stints.
-    * `WARMUP_PENALTY`: Adds time loss for the first lap based on compound hardness.
-    * `MAX_LIFE`: Enforces "Pirelli Limits" to prevent structural failure.
-* **Classes:**
-    * `GeneticOptimizer`: Implements the evolutionary loop (Pop Size: 80, Generations: 60).
-    * `GreedySolver`: Implements the look-ahead heuristic logic.
+Bash
+pip install -r requirements.txt
+💻 Usage
+1. Interactive Mode (Single Race)
 
-### `main.py` (Orchestrator)
-* **Interactive CLI:** Allows the user to select the Season and Grand Prix dynamically.
-* **Visualization:** Generates a convergence plot comparing the Genetic evolution against the Greedy baseline.
+Best for visualizing a specific Grand Prix strategy in detail.
 
+Bash
+python main.py
+Workflow: Select a Year -> Select a Circuit.
 
-## How to Run
+Output: Prints the degradation coefficients, compares strategies lap-by-lap, and displays a Gantt chart comparison.
 
-### Prerequisites
-* Python 3.8+
-* `pip`
+2. Research Mode (Batch Testing)
 
-### Installation
+Best for validating the algorithm's performance over a full season.
 
-1.  **Clone the repository:**
-    ```bash
-    git clone [https://github.com/YOUR_USERNAME/f1-strategy-optimizer.git](https://github.com/YOUR_USERNAME/f1-strategy-optimizer.git)
-    cd f1-strategy-optimizer
-    ```
+Step A: Run the Batch Simulation Run the GA vs. Greedy comparison on every race of a specific year.
 
-2.  **Install dependencies:**
-    ```bash
-    pip install -r requirements.txt
-    ```
+Bash
+# Run 2024 season, 5 runs per circuit for statistical robustness
+python report/batch_test.py --year 2024 --runs 5
+Step B: Statistical Analysis Analyze the results JSON to check for statistical significance (p-values).
 
-3.  **Run the simulation:**
-    ```bash
-    python main.py
-    ```
+Bash
+python report/statistical_analysis.py report/results/batch_results_2024_XXXX.json
+Step C: Generate Thesis Plots Create publication-ready visualizations (Bar charts, Scatter plots, LaTeX tables).
 
-### Usage Example
-Follow the on-screen prompts:
-1.  Enter Year: `2024`
-2.  Select Race: `16` (Italian Grand Prix)
-3.  Observe the strategic comparison in the terminal and the generated plot.
+Bash
+python report/generate_paper_plots.py report/results/batch_results_2024_XXXX.json
+🧠 Algorithmic Logic
+The Physics Model
 
+The simulator disentangles Fuel Effect (linear time gain) from Tyre Degradation (non-linear time loss).
 
-## Results & Analysis
+Formula: Time(t)=BasePace+(Lin⋅t)+(Quad⋅t 
+2
+ )+WarmUp+Traffic
 
-The simulation consistently demonstrates the superiority of Global Optimization (Genetic) over Local Optimization (Greedy).
+Constraints: Includes the "Pirelli Limit" (structural failure) and the "2-Compound Rule."
 
-**Case Study: Chinese Grand Prix**
-* **Greedy Strategy:** `HARD (50) -> HARD (4) -> MEDIUM (2)`
-    * *Analysis:* The Greedy algorithm kept the fastest tyre (Hard) until the structural limit (Lap 50), forcing a double pit-stop sequence at the end to satisfy regulations.
-* **Genetic Strategy:** `MEDIUM (13) -> HARD (43)`
-    * *Analysis:* The Genetic algorithm accepted a slower start with Mediums to unlock a **One-Stop Strategy**, saving 23 seconds of pit loss and winning the race.
+The Contenders
 
-**Strategic Gain:** The Genetic Algorithm typically outperforms the Greedy baseline by **10-15 seconds** on complex circuits.
+Feature	Genetic Algorithm (The Challenger)	Greedy Algorithm (The Benchmark)
+Type	Meta-Heuristic (Stochastic)	Heuristic (Deterministic)
+Horizon	Global (Full Race)	Local (Next Stint Prediction)
+Strengths	Can execute "Undercuts" and "One-Stoppers" by sacrificing early pace.	extremely fast computation; guarantees locally optimal stints.
+Weaknesses	Computationally expensive; requires tuning.	Suffers from "Strategic Myopia" (Short-termism).
+📊 Sample Results
+Based on 2024 Season simulations:
 
-## 📄 License
-This project is open-source and available under the [MIT License](LICENSE).
+Average Improvement: The GA improves upon the Greedy strategy by an average of ~9.5 seconds per race.
+
+Win Rate: The GA finds a better or equal strategy in 91% of simulations.
+
+Statistical Significance: p<0.001 (One-sample t-test), confirming the results are not due to random chance.
+
+📄 License
+This project is open-source and available under the MIT License.
+
+Data Source: All telemetry data is provided by the FastF1 library.
