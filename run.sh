@@ -20,8 +20,8 @@ echo ""
 
 # Configuration
 YEAR=2024
-RUNS=3
-MAX_CIRCUITS=15  # Set to empty for all circuits
+RUNS=5
+MAX_CIRCUITS=""  # Set to empty for all circuits
 PYTHON=python3
 
 # Colors for output

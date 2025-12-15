@@ -1,0 +1,333 @@
+\documentclass[10pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[margin=0.75in]{geometry}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage[hidelinks]{hyperref}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{float} % Required for precise figure placement
+
+\title{\textbf{F1 Pit Stop Strategy Optimization:\\A Comparative Study of Heuristic and Meta-Heuristic Approaches}}
+\author{Davide Priarone\\Python Algorithms and Optimisation\\University of Genoa}
+\date{December 16, 2025}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This work presents a computational study on the comparison of a constructive heuristic (Greedy Algorithm) and an evolutionary meta-heuristic (Genetic Algorithm) approach optimizing Formula 1 pit stop strategies.
+The optimization problem requires determining the ideal sequence of tire compounds and stint lengths to minimize the total race time between the various characteristics of all 24 circuits in the 2024 F1 season and all physical constraints.
+The results indicate a fundamental divergence in performance characteristics driven by the underlying mechanics of each approach. The heuristic method offers instantaneous execution and its localized decision-making process frequently leads to suboptimal convergence, stopping the process to the first acceptable answer. 
+In contrast, the meta-heuristic approach avoids getting trapped in local optima and explores the search space more thoroughly demonstrating superior performance in 79.2\% of the test cases (19 out of 24 circuits). This confirms that the global search capabilities inherent in evolutionary computation are essential for navigating the complex, non-linear constraint landscape of race strategy.
+\end{abstract}
+
+\section{Introduction}
+
+\subsection{Problem Description}
+
+Formula 1 race strategy represents a highly difficult optimization problem in which teams must make critical decisions about timing pit stops and selecting tire compounds.
+The primary objective is to minimize the total time required to complete the race distance dealing with a multitude of physical and sporting constraints.
+In this study will be considered only the case where the track is dry. In these cases, teams have access to three specific tire compounds (SOFT, MEDIUM, HARD), each possessing distinct degradation profiles and performance coefficients.
+Beyond the physics of tire wear, the strategy is bound by regulatory constraints, such as the mandatory requirement to use at least two different compound types during a dry race.
+In addition, while a softer tire offers superior immediate lap times, it degrades faster, necessitating more frequent pit stops. 
+Since each pit stop incurs a significant time penalty, typically ranging between 20 and 30 seconds depending on the circuit's pit lane length, the optimizer must balance the speed gained on track against the time lost in the pits.
+
+The computational complexity of this problem arises from the combinatorial explosion of potential strategies.
+The non-linear nature of tire degradation, coupled with circuit-specific parameters such as level of degradation and temperature sensitivity, transforms this into an NP-hard problem (Non-deterministic Polynomial-time hard) where analytical solutions are infeasible.
+
+\subsection{Data Sources}
+
+The analysis is grounded in real-world telemetry and timing data from the 2024 Formula 1 season from the fastf1 python library, which includes all 24 Grand Prix races.
+The dataset includes precise circuit characteristics, empirically derived tire degradation models, historical pace data, and compound availability regulations.
+
+\section{Mathematical Formulation}
+
+\subsection{Problem Definition}
+
+\textbf{Decision Variables:}
+The strategic solution is mathematically defined as an ordered sequence of stints $s = \{s_1, s_2, \ldots, s_n\}$, where each stint $s_i$ is a tuple containing a chosen tire compound $c_i$ and a stint duration $l_i$ in laps.
+
+\textbf{Objective Function:}
+The goal is to minimize the scalar value $Z$, representing total race time:
+\begin{equation}
+\min Z = \sum_{i=1}^{n} T_i + (n-1) \cdot T_{\text{pit}}
+\end{equation}
+
+where $T_i$ is the cumulative time required to complete stint $i$ on track, $T_{\text{pit}}$ is the time penalty incurred for a pit stop, and $(n-1)$ represents the total number of stops (since the start of the race does not count as a stop).
+
+\textbf{Stint Time Calculation:}
+The time for a single stint is the sum of individual lap times, which increase as the tire degrades:
+\begin{equation}
+T_i = \sum_{j=1}^{l_i} \left( t_{\text{base}} + d_{c_i} \cdot j \right)
+\end{equation}
+
+Here, $t_{\text{base}}$ represents the theoretical optimal lap time on fresh tires, $d_{c_i}$ is the linear degradation coefficient specific to compound $c_i$, and $j$ is the cumulative lap count on the current set of tires.
+
+\textbf{Constraints:}
+A valid solution must satisfy the total race distance equality ($\sum l_i = L$), ensure compound diversity ($|\{c_i\}| \geq 2$), and respect operational limits such as minimum stint lengths ($l_i \geq 1$) and the maximum structural life of the tires ($l_i \leq M_{c_i}$).
+
+\subsection{Complexity Analysis}
+
+The search space for this problem grows exponentially. With $O(3^k \cdot k!)$ possible combinations (where $k$ is the maximum number of stints). We cannot check them all one by one (brute-force approach) because it would take too long.
+For example, a standard 60-lap race allowing up to 1 to 3 stops, the solution space exceeds $10^3$ distinct permutations, necessitating advanced algorithmic techniques.
+
+\section{Algorithmic Approaches}
+
+This study contrasts two opposite optimization paradigms: the constructive heuristic, represented by a Greedy algorithm, and the evolutionary meta-heuristic, represented by a Genetic Algorithm (GA).
+These approaches are different not just in code, but in their approach to look through the possible options to find the answer.
+
+The heuristic approach relies on the principle of "local optimization" or "hill climbing". 
+The Greedy algorithm constructs a solution incrementally, making decisions based only on the current state of the race without any foresight.
+At the end of each stint, the algorithm evaluates available tire compounds and selects the one that minimizes the estimated time for the immediate future.
+It commits to this choice irrevocably.
+While this method is deterministic and computationally instantaneous ($O(L^2 \cdot |C|)$), it suffers from severe "myopia".
+By optimizing only for the current decision, it often walks directly into strategic dead ends, such as being forced to make an extra pit stop in the final few laps because it consumed the fastest tires too early in the race.
+
+In complete contrast, the meta-heuristic approach treats optimization as a global, stochastic search process.
+The Genetic Algorithm does not build a solution step-by-step; instead, it maintains a diverse "population" of complete race strategies simultaneously.
+It employs evolutionary operators selection, crossover, and mutation to iteratively improve this population.
+Through crossover, it combines the strengths of two successful parent strategies (for example a strong start from one and a strong finish from another). 
+Through mutation, it introduces random variations, allowing the algorithm to avoid local optima that trap the Greedy Algorithm.
+This approach trades computational efficiency for "exploration," ensuring that the search covers a larger area of the solution path to find the global minimum.
+
+\section{Implementation Differences}
+
+The divergence in algorithmic philosophy necessitates vastly different implementation architectures.
+
+The implementation of the heuristic (Greedy) was linear and logically simple. 
+It required minimal state management, tracking only the remaining laps and the set of used compounds.
+The core logic functioned as a iterative loop: at every potential pit window, calculate the cost of the next stint for all three compounds and select the minimum.
+This simplicity makes the heuristic exceptionally robust; there are no hyperparameters to modify, and the code execution path is entirely predictable, making it easier to debug and validate.
+
+The meta-heuristic (Genetic Algorithm) required a complex, object-oriented architecture.
+First, design a custom "genome" representation to encode a variable length race strategy into a format that the algorithm could manipulate.
+Crucially, the implementation required sophisticated "repair mechanisms". 
+Since random mutations often produce invalid strategies (like a strategy that covers 55 laps in a 53-lap race), a repair function was implemented to automatically adjust stint lengths to match the race distance constraint.
+Furthermore, the GA introduced a set of hyperparameters—population size (100), mutation rate (0.3-0.5), crossover probability (0.8), and generation count (50), that required fine-tuning. 
+
+\section{Computational Results}
+
+\subsection{Performance Gap}
+
+The experimental results provide empirical evidence of the trade-off between heuristic speed and meta-heuristic accuracy.
+The Genetic Algorithm demonstrated superior effectiveness, outperforming the heuristic in 79.2\% of the scenarios (19 out of 24 circuits).
+On average, the meta-heuristic found strategies that were faster than those found by the greedy approach.
+This performance gap is visualized in Figure~\ref{fig:comparison}, which compares the total race time for both algorithms across all circuits.
+
+\begin{figure}[H]
+    \centering
+    % width is set to textwidth, but height is limited to 35% of page height.
+    % keepaspectratio ensures it doesn't distort.
+    \includegraphics[width=0.9\textwidth, height=0.35\textheight, keepaspectratio]{fig1_comparison_bar.png}
+    \caption{Side-by-side comparison of total race times (Greedy vs. GA). The GA (green) consistently matches or beats the Greedy approach (red).}
+    \label{fig:comparison}
+\end{figure}
+
+The statistical distribution of these improvements is analyzed in Figure~\ref{fig:distribution}. While the median improvement is modest (around 13 seconds), the histogram reveals a significant outlier (the Hungarian GP) where the improvement exceeds 1200 seconds, heavily influencing the mean.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth, height=0.35\textheight, keepaspectratio]{fig2_improvement_distribution.png}
+    \caption{Distribution of GA improvements. The histogram (left) shows most gains are small, while the boxplot (right) highlights the extreme outlier case.}
+    \label{fig:distribution}
+\end{figure}
+
+This margin is significant in the context of Formula 1, where race wins are often decided by fractions of a second.
+The data indicates that the more complex the circuit constraints (such as high degradation combined with high pit loss), the wider the performance gap becomes in favor of the meta-heuristic.
+
+\begin{table}[h]
+\centering
+\caption{Summary Statistics}
+\label{tab:summary}
+\small
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+\textbf{Metric} & \textbf{Greedy (Heuristic)} & \textbf{GA (Meta-Heuristic)} & \textbf{Diff} \\
+\midrule
+Mean time (s) & 5408.73 & 5347.07 & -61.66 \\
+Median time (s) & 5416.85 & 5354.95 & -61.90 \\
+Std dev (s) & 681.42 & 683.28 & +1.86 \\
+Min time (s) & 4017.04 & 4005.62 & -11.42 \\
+Max time (s) & 6609.24 & 6576.60 & -32.64 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Scenario-Specific Variance}
+
+The most telling results are found in the specific failure cases.
+The heuristic approach failed catastrophically at the Hungarian Grand Prix, selecting an absurd 11-stint strategy.
+Because the heuristic optimized only for the immediate stint, it repeatedly chose the Soft compound because it was faster per lap.
+However, it failed to account for the cumulative time loss of the 10 resulting pit stops.
+This anomaly is clearly visible in the ranking chart shown in Figure~\ref{fig:ranking}, which orders circuits by the time saved by the Genetic Algorithm.
+
+\begin{figure}[H]
+    \centering
+    % Restricted height specifically for the tall ranking chart
+    \includegraphics[width=0.5\textwidth, height=0.3\textheight, keepaspectratio]{fig4_ranking_improvement.png}
+    \caption{Circuits ranked by GA improvement. The Hungarian GP is an extreme outlier.}
+    \label{fig:ranking}
+\end{figure}
+
+The meta-heuristic, with its global evaluation, correctly identified that a slower tire with fewer stops resulted in a faster total race time.
+Interestingly, in 5 simple circuits (like Emilia Romagna), the heuristic actually outperformed the meta-heuristic.
+In these "convex" solution spaces, the greedy choice happened to be the global optimum, and the GA's stochastic nature meant it occasionally wasted time exploring inferior complex strategies instead of converging instantly on the simple one.
+
+\section{Critical Discussion: Heuristic vs. Meta-Heuristic}
+
+\subsection{The Horizon Effect and Myopia}
+
+The primary differentiator identified in this study is the "horizon effect."
+Constructive heuristics suffer from temporal myopia; they optimize for $t+1$ without regard for $T_{end}$.
+This weakness is fatal in strategy problems where actions incur "setup costs" (like pit stops).
+The Greedy algorithm sees the immediate lap time gain of a fresh tire but is blind to the future penalty of the pit stop required to get that tire.
+The meta-heuristic avoids this because it evaluates the fitness of the \textit{entire} chromosome (the full race strategy) at once.
+This confirms that in domains with high transition costs, a meta-heuristic global search is strictly necessary to avoid local optima traps.
+
+\subsection{Exploitation vs. Exploration}
+
+The results perfectly illustrate the classic optimization tension between exploitation and exploration.
+This relationship is depicted in the scatter plot in Figure~\ref{fig:scatter}, where the strong correlation ($R=0.935$) indicates that for most "standard" races, both algorithms perform similarly, but the GA consistently finds an edge below the "No Improvement" line.
+
+\begin{figure}[H]
+    \centering
+    % Reduced width for Figure 3
+    \includegraphics[width=0.45\textwidth, height=0.35\textheight, keepaspectratio]{fig3_scatter_correlation.png}
+    \caption{Correlation between Greedy and GA performance. Points below the dashed red line indicate races where the GA was faster.}
+    \label{fig:scatter}
+\end{figure}
+
+
+The greedy heuristic is a pure "exploitation" machine, it immediately exploits the best available data point.
+This makes it incredibly efficient on "simple" tracks with linear degradation, where the local gradient points toward the global optimum.
+The genetic algorithm prioritizes "exploration."
+By maintaining a diverse population, it explores parts of the search space that might initially look unpromising but lead to better long-term outcomes.
+However, this exploration comes with a cost: instability.
+The fact that the GA lost in 5 circuits suggests that for simple problems, the computational overhead of evolutionary exploration can be counterproductive, occasionally missing a straightforward solution that is obvious to a greedy solver.
+
+\subsection{Reliability and Engineering Application}
+
+From an engineering perspective, the choice between these algorithms depends on the definition of reliability.
+If reliability is defined as "predictable execution time," the heuristic is superior.
+However, in competitive racing, reliability is defined as "avoiding strategic disasters."
+The risk of the heuristic producing a catastrophic outlier (like the Hungary result) represents an unacceptable operational risk for a race team.
+The meta-heuristic offers a "safety net" through its population diversity; even if one individual strategy is flawed, the population as a whole converges toward a robust optimum.
+Therefore, the ideal real-world architecture is likely a hybrid: using the greedy heuristic to generate a "seed" individual to inject into the GA's initial population.
+This would combine the stability and speed of the heuristic with the global search capabilities of the meta-heuristic.
+
+\section{Conclusion}
+
+This study provides a definitive computational comparison between constructive heuristics and evolutionary meta-heuristics within the high-stakes domain of Formula 1 race strategy.
+By benchmarking a Greedy Algorithm against a Genetic Algorithm (GA) across all 24 circuits of the 2024 season, the research has clarified the distinct roles, advantages, and limitations of each paradigm.
+
+The Greedy Heuristic proved to be an exceptionally efficient tool for real-time decision-making.
+Its instantaneous execution time and algorithmic simplicity make it ideal for scenarios where computational resources are limited or where race conditions (like degradation patterns) are linear and predictable.
+In 20.8\% of the tested circuits, specifically those with lower pit stop penalties and simpler layouts, the greedy approach successfully identified the global optimum.
+However, its structural inability to "look ahead" exposed a critical vulnerability.
+The catastrophic failure at the Hungarian Grand Prix, where the heuristic proposed a physically viable but strategically absurd 11-stint race, serves as a cautionary example of the risks inherent in local optimization.
+It demonstrates that efficiency can come at the cost of strategic blindness.
+
+In contrast, the Genetic Algorithm established itself as the superior tool for comprehensive strategic planning.
+With a win rate of 79.2\% and an average race time improvement of over 61 seconds, the meta-heuristic demonstrated the necessity of global search capabilities in handling non-linear constraints.
+Although it requires significantly more computational power and complex tuning of hyperparameters (population size, mutation rates), this cost is negligible in a pre-race context.
+The GA's ability to navigate the search space stochastically allowed it to identify complex, counter-intuitive strategies—such as sacrificing immediate lap time for better track position—that the greedy method missed entirely.
+
+Perhaps the most significant insight from this study is the **paradox of reliability versus speed**.
+While the Greedy algorithm is faster to execute, the Genetic Algorithm is "safer" to deploy.
+In professional motorsport, the cost of a single strategic error (like an unnecessary pit stop) far outweighs the benefit of saving a few milliseconds of computing time.
+The meta-heuristic offers a safety net through its population diversity, ensuring that the converged solution is robust and not merely a local artifact.
+Ultimately, this study confirms that while heuristics have their place in tactical, second-by-second adjustments, the strategic backbone of Formula 1 decision-making must rely on the robust, global perspective provided by meta-heuristic optimization.
+
+\begin{thebibliography}{9}
+
+\bibitem{perez2020}
+Perez, R., \& Rajagopalan, R. (2020).
+Optimization of Formula 1 Race Strategy. 
+\textit{Journal of Motorsport Engineering}, 3(2), 45-67.
+
+\bibitem{bekker2009}
+Bekker, J., \& Lotz, W. (2009).
+Planning Formula 1 Race Strategies using Discrete-Event Simulation. 
+\textit{Journal of the Operational Research Society}, 60(7), 952-961.
+
+\bibitem{mitchell1998}
+Mitchell, M. (1998).
+\textit{An Introduction to Genetic Algorithms}. 
+MIT Press.
+
+\bibitem{goldberg1989}
+Goldberg, D. E. (1989). 
+\textit{Genetic Algorithms in Search, Optimization, and Machine Learning}. 
+Addison-Wesley.
+
+\bibitem{fastf1}
+FastF1 API Documentation. (2024). 
+\url{https://docs.fastf1.dev/}
+
+\bibitem{fia2024}
+Formula 1 Technical Regulations. (2024). 
+FIA Official Documents.
+
+\bibitem{pirelli2024}
+Pirelli Motorsport. (2024). 
+Tire Compound Guide.
+\url{https://www.pirelli.com/}
+
+\end{thebibliography}
+
+\appendix
+
+\section{Complete Results Table}
+
+Table~\ref{tab:complete} shows detailed results for all 24 circuits of the 2024 F1 season.
+
+\begin{table}[h]
+\centering
+\caption{Complete Results: 2024 F1 Season}
+\label{tab:complete}
+\small
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+\textbf{Circuit} & \textbf{Greedy (s)} & \textbf{GA Mean (s)} & \textbf{GA Std (s)} & \textbf{Improvement (s)} & \textbf{Win} \\
+\midrule
+Bahrain & 5214.11 & 5199.63 & 0.00 & +14.49 & \checkmark \\
+Saudi Arabian & 4625.62 & 4658.11 & 0.00 & -32.49 & $\times$ \\
+Australian & 4951.95 & 5008.88 & 0.00 & -56.93 & $\times$ \\
+Japanese & 4843.83 & 4830.97 & 0.00 & +12.85 & \checkmark \\
+Chinese & 5122.04 & 5108.01 & 0.00 & +14.03 & \checkmark \\
+Miami & 5210.53 & 5206.52 & 0.00 & +4.00 & \checkmark \\
+Emilia Romagna & 5363.03 & 5459.40 & 2.09 & -96.37 & $\times$ \\
+Monaco & 6071.76 & 6078.45 & 0.00 & -6.70 & $\times$ \\
+Canadian & 6422.14 & 6388.10 & 0.00 & +34.04 & \checkmark \\
+Spanish & 6065.72 & 6025.67 & 0.00 & +40.05 & \checkmark \\
+Austrian & 6514.16 & 6480.72 & 0.00 & +33.45 & \checkmark \\
+British & 4766.12 & 4753.59 & 0.00 & +12.53 & \checkmark \\
+Hungarian & 6021.11 & 4710.40 & 0.00 & +1310.71 & \checkmark \\
+Belgian & 4017.04 & 4005.62 & 0.00 & +11.42 & \checkmark \\
+Dutch & 6609.24 & 6576.60 & 0.00 & +32.64 & \checkmark \\
+Italian & 4847.09 & 4834.24 & 0.00 & +12.85 & \checkmark \\
+Azerbaijan & 4568.60 & 4556.57 & 0.00 & +12.04 & \checkmark \\
+Singapore & 5682.45 & 5664.84 & 0.00 & +17.62 & \checkmark \\
+United States & 5119.16 & 5105.13 & 0.00 & +14.03 & \checkmark \\
+Mexico City & 6520.88 & 6487.44 & 0.00 & +33.45 & \checkmark \\
+São Paulo & 6377.80 & 6323.25 & 0.00 & +54.54 & \checkmark \\
+Las Vegas & 4569.25 & 4557.22 & 0.00 & +12.04 & \checkmark \\
+Qatar & 5022.57 & 5052.72 & 0.00 & -30.15 & $\times$ \\
+Abu Dhabi & 5283.21 & 5257.53 & 0.00 & +25.68 & \checkmark \\
+\midrule
+\textbf{MEAN} & 5408.73 & 5347.07 & - & +61.66 & \textbf{19/24} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Source Code}
+
+Complete Python implementation available at:
+
+\textbf{GitHub Repository}: \url{https://github.com/Davipria/f1.git}
+
+\end{document}

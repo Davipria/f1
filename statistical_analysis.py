@@ -231,8 +231,7 @@ class StatisticalAnalyzer:
         print(f"  Ties:       {ties}/{total}")
         
         # Binomial test: Is win rate significantly > 50%?
-        p_value = stats.binom_test(wins, total, 0.5, alternative='greater')
-        
+        p_value = stats.binomtest(wins, total, 0.5, alternative='greater').pvalue        
         print(f"\nBinomial Test (H0: win rate = 50%):")
         print(f"  p-value: {p_value:.6f}")
         
